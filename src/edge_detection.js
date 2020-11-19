@@ -1,7 +1,8 @@
 var edgeDetectionConfig = {
     operator : "sobel",
     grayScaleMode : "natural",
-    invertEdgeImage : true //The edges will be black when true
+    invertEdgeImage : true, //The edges will be black when true
+    edgeThreshold : 150
 }
 
 /*
@@ -38,7 +39,18 @@ export function sobel(pixels, width, height){
         values.push(255)
     }
 
-    
+    for(let i = 0; i < width*height*4; i+=4){
+        if(values[i] > edgeDetectionConfig.edgeThreshold){
+            values[i] = 255
+            values[i+1] = 255
+            values[i+2] = 255
+        } else {
+            values[i] = 0
+            values[i+1] = 0
+            values[i+2] = 0
+        }
+
+    }
 
     return Uint8ClampedArray.from(values)
 }
@@ -71,7 +83,9 @@ export function generateEdges(pixels, width, height){
     console.log(pixelData)
     console.log("start generating edges")
     toGrayScale(pixelData)
-    pixelData = gaussianBlur(pixelData, width, height)
+    //FIXME: gaussian blur doesn't really wokr; it makes no difference
+    // pixelData = gaussianBlur(pixelData, width, height)
+    pixelData = applyMeanFilter(pixelData, width, height,5)
     if(edgeDetectionConfig.operator === "sobel"){
         pixelData = sobel(pixelData, width, height)
     }
@@ -79,7 +93,30 @@ export function generateEdges(pixels, width, height){
     return pixelData
 }
 
+//Returns a n x n Kernel
+function makeGaussKernel(n, sigma){
+    let kernel = new Array(n*n)
+    let d = (n-1)/2
+    for(let y = -d; y <= d; y++){
+        for(let x = -d; x <= d; x++){
+            kernel[(y+d) * n + x + d] = 1/(2 * Math.PI * sigma*sigma) * Math.pow(Math.E, (-1) * (x*x + y*y)/2*sigma*sigma)
+        }
+    }
+    let sum = 0
+    for(let i = 0; i < kernel.length; i++){
+        sum += kernel[i]
+    }
+    console.log(kernel)
+    for(let i = 0; i < kernel.length; i++){
+        kernel[i] /= sum
+    }
+    return kernel
+}
+
 function gaussianBlur(pixels, width, height) {
+
+    const kernelSize = 49
+    const kernel = makeGaussKernel(kernelSize,10)
 
     // return applyGaussianFilter(pixels, width, height, [1,2,1,2,4,2,1,2,1], 3)
     return applyGaussianFilter(pixels, 
@@ -97,7 +134,9 @@ function gaussianBlur(pixels, width, height) {
 }
 
 function applyGaussianFilter(pixelData, width, height, filter, size){
-    let newData = new Uint8ClampedArray(4*width*height)
+    console.log("before filter")
+    console.log(pixelData)
+    let newData = new Array(4*width*height)
 
     let filterSum = 0
 
@@ -109,7 +148,9 @@ function applyGaussianFilter(pixelData, width, height, filter, size){
 
     for(let i = 0; i < width*height*4; i+=4){
         let x = Math.floor(i/4)%width
-        let y = Math.floor(Math.floor(i/4)/height)
+        let y = Math.floor(i/4/width)
+
+        
 
         //When a part of the filter is out of bounds, the current pixel will be ignored      
 
@@ -118,6 +159,7 @@ function applyGaussianFilter(pixelData, width, height, filter, size){
             newData[i+1] = pixelData[i]
             newData[i+2] = pixelData[i]
             newData[i+3] = 255
+            
             continue
         }
 
@@ -127,7 +169,8 @@ function applyGaussianFilter(pixelData, width, height, filter, size){
                 sum += pixelData[i+4*width*yd+4*xd]*filter[(yd+dBound)*size+xd+dBound]
             }
         }
-        let avg = sum / (filterSum)
+
+        let avg = sum / filterSum
         // console.log(avg)
         newData[i] = avg
         newData[i+1] = avg
@@ -135,8 +178,52 @@ function applyGaussianFilter(pixelData, width, height, filter, size){
         newData[i+3] = 255
     }
 
-    console.log("applied filter")
-    console.log(newData)
-
-    return newData
+    return Uint8ClampedArray.from(newData)
 }
+
+function applyMeanFilter(pixelData, width, height, size){
+    console.log("before filter")
+    console.log(pixelData)
+    let newData = new Array(4*width*height)
+
+    let filterSum = 0
+
+
+
+    let dBound = (size-1)/2
+
+    for(let i = 0; i < width*height*4; i+=4){
+        let x = Math.floor(i/4)%width
+        let y = Math.floor(i/4/width)
+
+        
+
+        //When a part of the filter is out of bounds, the current pixel will be ignored      
+
+        if(x < dBound || y < dBound || x >= (width-dBound) || y >= (height-dBound) ){
+            newData[i] = pixelData[i]
+            newData[i+1] = pixelData[i]
+            newData[i+2] = pixelData[i]
+            newData[i+3] = 255
+            
+            continue
+        }
+
+        let sum = 0
+        for(let yd = -dBound; yd <= dBound; yd++){
+            for(let xd = -dBound; xd <= dBound; xd++){
+                sum += pixelData[i+4*width*yd+4*xd]
+            }
+        }
+
+        let avg = sum / (size*size)
+        // console.log(avg)
+        newData[i] = avg
+        newData[i+1] = avg
+        newData[i+2] = avg
+        newData[i+3] = 255
+    }
+
+    return Uint8ClampedArray.from(newData)
+}
+
