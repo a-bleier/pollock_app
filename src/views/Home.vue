@@ -3,21 +3,26 @@
   <button @click="convert">Convert</button>
   <img :src="currentImageFile" id="preview">
 
-  <div id="canvas-container">
+  <div id="canvas-container"></div>
 
-  </div>
+  <DrawBoard />
+  
   
 </template>
 
 <script>
 // @ is an alias to /src
 import FileLoader from "../components/FileLoader"
+import DrawBoard from "../components/DrawBoard"
 import {generateEdges} from "../edge_detection.js"
+
+
 
 export default {
   name: 'Home',
   components: {
-   FileLoader
+   FileLoader,
+   DrawBoard
   },
   data(){
     return {
@@ -49,7 +54,7 @@ export default {
       originImage.data.set(edgeData)
       ctx.putImageData(originImage,0,0)
     }
-  },
+  }
 
 }
 </script>
